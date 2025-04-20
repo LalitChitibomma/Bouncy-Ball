@@ -1,0 +1,127 @@
+<html>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+    attribute  vec4 vPosition;
+    attribute  vec2 vUV;
+    attribute  vec3 vNormal;
+
+    varying  vec2 fUV;
+    varying  vec3 fNormal;
+    varying  vec4 fColor;
+    varying  vec3 fPosition;
+
+    uniform vec3 theta;
+    uniform float displacement_y;
+    uniform mat4 mRotation;
+
+    void main()
+    {
+        // Compute the sines and cosines of theta for each of
+        //   the three axes in one computation.
+        vec3 angles = radians( theta );
+        vec3 c = cos( angles );
+        vec3 s = sin( angles );
+
+        // Remeber: thse matrices are column-major
+        mat4 rx = mat4( 1.0,  0.0,  0.0, 0.0,
+        0.0,  c.x,  s.x, 0.0,
+        0.0, -s.x,  c.x, 0.0,
+        0.0,  0.0,  0.0, 1.0 );
+
+        mat4 ry = mat4( c.y, 0.0, -s.y, 0.0,
+        0.0, 1.0,  0.0, 0.0,
+        s.y, 0.0,  c.y, 0.0,
+        0.0, 0.0,  0.0, 1.0 );
+
+
+        mat4 rz = mat4( c.z, s.z, 0.0, 0.0,
+        -s.z,  c.z, 0.0, 0.0,
+        0.0,  0.0, 1.0, 0.0,
+        0.0,  0.0, 0.0, 1.0 );
+
+        float near = 0.1;
+        float far = 100.;
+        mat4 mProjection = mat4(1., 0., 0., 0.,
+        0., 1., 0., 0.,
+        0., 0., (near+far)/(near-far), -1.,
+        0., 0., 2.* near *far/(near -far), 0.);
+
+        mat4 translation = mat4(1., 0., 0., 0.,
+        0., 1., 0., 0.,
+        0., 0., 1., 0.,
+        0., displacement_y, -3., 1.);
+
+
+        gl_Position = mProjection * translation * mRotation * rz * ry * rx * vPosition;
+        fUV = vUV;
+        fNormal =  (mRotation*rz * ry * rx * vec4(vNormal,0.)).xyz;
+        fColor = vPosition+vec4(0.5,0.5,0.5,0.);
+    }
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+
+precision mediump float;
+varying vec2 fUV;
+varying vec3 fNormal;
+varying vec4 fColor;
+varying vec3 fPosition;
+
+uniform sampler2D uSampler;   
+uniform bool useTexture;
+uniform bool isPyramid;
+
+vec2 blinnPhongDir(vec3 lightDir, float lightInt, float Ka, float Kd, float Ks, float shininess)
+{
+  vec3 s = normalize(lightDir);
+  vec3 v = normalize(-fPosition);
+  vec3 n = normalize(fNormal);
+  vec3 h = normalize(v+s);
+  float diffuse = Ka + Kd * lightInt * abs(dot(n, s));
+  float spec =  Ks * pow(max(0.0, dot(n,h)), shininess);
+  return vec2(diffuse, spec);
+}
+
+void main()
+{
+    vec3 lightDirection = normalize(vec3(1., 2., 0.5));
+    float shading = max(0., dot(fNormal, lightDirection));
+    vec2 lighting;
+    vec4 color;
+
+    if (useTexture && isPyramid)
+    {
+        lighting = blinnPhongDir(normalize(vec3(1., 0.2, 0.5)), 4., 0.1, 0.7, 0.3, 32.);
+        color = vec4(lighting[0]*vec3(0.7,0.2,0.9) + lighting[1]*vec3(1.,1.,1.), 1.);
+
+        gl_FragColor = color * texture2D(uSampler, fUV) + vec4(0.2, 0.2, 0.2, 0.);
+    }
+
+    else if (useTexture)
+    {
+        lighting = blinnPhongDir(normalize(vec3(1., 0.2, 0.5)), 7., 0.1, 0.7, 0.3, 32.);
+        color = vec4(lighting[0]*vec3(0.1,0.4,0.3) + lighting[1]*vec3(1.,1.,1.), 1.);
+
+        gl_FragColor = color * texture2D(uSampler, fUV) + vec4(0.2, 0.2, 0.2, 0.);
+    }
+    else    
+        gl_FragColor = fColor;
+}
+</script>
+
+<script type="text/javascript" src="./Common/webgl-utils.js"></script>
+<script type="text/javascript" src="./Common/initShaders.js"></script>
+<script type="text/javascript" src="./Common/MV.js"></script>
+<script type="text/javascript" src="Project2.js"></script>
+
+<body>
+<canvas id="gl-canvas" width="512" height="512">
+Oops ... your browser doesn't support the HTML5 canvas element
+</canvas>
+<br />
+<button id="xButton">Rotate X</button>
+<button id="yButton">Rotate Y</button>
+<button id="zButton">Rotate Z</button>
+<button id="pButton">Pause</button>
+</body>
+</html>
