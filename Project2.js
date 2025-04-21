@@ -36,7 +36,8 @@ window.onload = function init()
 
     cube();
 
-    rectangle();
+    //rectangle();
+    sphere();
 
     initTexture();
 
@@ -90,6 +91,7 @@ function initGL()
 }
 
 var buffers = [];
+/*
 function rectangle()
 {
     r = 1.7;
@@ -147,6 +149,65 @@ function rectangle()
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(flatten(indices)), gl.STATIC_DRAW);
     buffers.push(tBuffer);
 }
+*/
+function sphere(subdivU = 40, subdivV = 40) {
+    points = [];
+    normals = [];
+    UVs = [];
+    indices = [];
+
+    let radius = 1.0;
+
+    for (let i = 0; i <= subdivU; ++i) {
+        let theta = i * Math.PI / subdivU;
+        for (let j = 0; j <= subdivV; ++j) {
+            let phi = j * 2 * Math.PI / subdivV;
+
+            let x = radius * Math.sin(theta) * Math.cos(phi);
+            let y = radius * Math.sin(theta) * Math.sin(phi);
+            let z = radius * Math.cos(theta);
+
+            points.push(vec3(x, y, z));
+            normals.push(normalize(vec3(x, y, z)));
+            UVs.push(vec2(j / subdivV, i / subdivU));
+        }
+    }
+
+    for (let i = 0; i < subdivU; ++i) {
+        for (let j = 0; j < subdivV; ++j) {
+            let first = i * (subdivV + 1) + j;
+            let second = first + subdivV + 1;
+
+            indices.push(first, second, first + 1);
+            indices.push(second, second + 1, first + 1);
+        }
+    }
+
+    nFaces = indices.length / 3;
+
+    // Create buffers (just like you do in rectangle())
+    let vBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW);
+    buffers.push(vBuffer);
+
+    let nBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(normals), gl.STATIC_DRAW);
+    buffers.push(nBuffer);
+
+    let tcBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, tcBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(UVs), gl.STATIC_DRAW);
+    buffers.push(tcBuffer);
+
+    let tBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(flatten(indices)), gl.STATIC_DRAW);
+    buffers.push(tBuffer);
+}
+
+
 
 var points3 = [];
 var normals3 = [];
