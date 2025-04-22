@@ -180,8 +180,8 @@ function render()
         velocity_y = 0.9999 * velocity_y - inc_t;
         displacement_y = displacement_y + velocity_y * 0.03;
 
-        if (displacement_y < -2.) {
-            displacement_y = -2.;
+        if (displacement_y < -1.5) {
+            displacement_y = -1.5;
             velocity_y = -velocity_y;
         }
     }
