@@ -69,7 +69,7 @@ varying vec3 fPosition;
 
 uniform sampler2D uSampler;   
 uniform bool useTexture;
-uniform bool isPyramid;
+uniform bool isSphere;
 
 vec2 blinnPhongDir(vec3 lightDir, float lightInt, float Ka, float Kd, float Ks, float shininess)
 {
@@ -89,7 +89,7 @@ void main()
     vec2 lighting;
     vec4 color;
 
-    if (useTexture && isPyramid)
+    if (useTexture && isSphere)
     {
         lighting = blinnPhongDir(normalize(vec3(1., 0.2, 0.5)), 4., 0.1, 0.7, 0.3, 32.);
         color = vec4(lighting[0]*vec3(0.7,0.2,0.9) + lighting[1]*vec3(1.,1.,1.), 1.);
