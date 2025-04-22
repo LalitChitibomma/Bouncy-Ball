@@ -54,7 +54,7 @@ window.onload = function init()
     };
 
     document.getElementById("pButton").onclick = function () {
-        if (isPause_t == true) 
+        if ((isPause_t == true) || (velocity_y ==0 && displacement_y != 0))
         {
             inc_t = 0.1;
             isPause_t = false;
