@@ -28,6 +28,9 @@ var isPause_t = false;
 var inc_r = 2.0;
 var isPause_r = false;
 
+let animationStarted = false;
+
+
 window.onload = function init()
 {
     initGL();
@@ -49,7 +52,7 @@ window.onload = function init()
     };
 
     document.getElementById("pButton").onclick = function () {
-        if ((isPause_t == true) || (velocity_y ==0 && displacement_y != 0))
+        if ((isPause_t == true))
         {
             inc_t = 0.1;
             isPause_t = false;
@@ -68,7 +71,15 @@ window.onload = function init()
     document.onmousemove = OnMouseMove;
     document.onmouseup = OnMouseUp;
 
-    render();
+    
+    requestAnimationFrame(render);
+
+    setTimeout(() => {
+        animationStarted = true;
+    }, 5000);
+    
+    
+  
 }
 
 function initGL()
@@ -163,17 +174,18 @@ function handleTextureLoaded(image, texture) {
     gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
-
 function render()
 {
-    velocity_y = 0.9999 * velocity_y - inc_t;
+    if (animationStarted) {
+        velocity_y = 0.9999 * velocity_y - inc_t;
+        displacement_y = displacement_y + velocity_y * 0.03;
 
-    displacement_y = displacement_y + velocity_y * 0.03;
-    if (displacement_y < -2.) {
-        displacement_y = -2.;
-        velocity_y = -velocity_y;
+        if (displacement_y < -2.) {
+            displacement_y = -2.;
+            velocity_y = -velocity_y;
+        }
     }
-    
+
     gl.uniform1f(gl.getUniformLocation(program, "displacement_y"), displacement_y);
 
     theta[axis] += inc_r;
@@ -182,18 +194,16 @@ function render()
     gl.uniformMatrix4fv(gl.getUniformLocation(program,"mRotation"), gl.FALSE, flatten(mRotation));
 
     gl.enable(gl.DEPTH_TEST);
-    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, sphereTexture);
     gl.uniform1i(gl.getUniformLocation(program, "uSampler"), 0);
 
-    //Link data to vertex shader input
     var vPosition = gl.getAttribLocation(program, "vPosition");
     var vNormal = gl.getAttribLocation(program, "vNormal");
     var vUV = gl.getAttribLocation(program, "vUV");
 
-    //Draw Sphere
     gl.bindBuffer(gl.ARRAY_BUFFER, buffers[0]);
     gl.vertexAttribPointer(vPosition, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vPosition);
@@ -214,6 +224,7 @@ function render()
 
     requestAnimationFrame(render);
 }
+
 
 function OnKeyDown(event)
 {
