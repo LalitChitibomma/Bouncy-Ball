@@ -29,6 +29,7 @@ var inc_r = 2.0;
 var isPause_r = false;
 
 let animationStarted = false;
+let squashTimer = 0;
 
 window.onload = function init()
 {
@@ -197,7 +198,33 @@ function render()
     theta[axis] += inc_r;
     gl.uniform3fv(gl.getUniformLocation(program, "theta"), theta);
 
-    gl.uniformMatrix4fv(gl.getUniformLocation(program,"mRotation"), gl.FALSE, flatten(mRotation));
+    let stretchMatrix = mat4();
+    let scaleFactor = (Math.abs(velocity_y))/4;
+
+
+    //note default stretch is 1.
+    //impact handling
+    if (displacement_y <= -1.5 && velocity_y < 0 ) {
+        // Wide in X and Z, squash in Y
+        stretchMatrix[0][0] = 1 + scaleFactor; //  stretch X
+        stretchMatrix[1][1] = 1 /(1 + scaleFactor); // squash Y
+        stretchMatrix[2][2] = 1 + scaleFactor; // stretch Z
+    }
+    //ball raising
+    if (displacement_y > -1.5 && velocity_y > 0){
+         // Skinny in Y and Z, squash in X
+         stretchMatrix[0][0] = 1 /(1 + scaleFactor); //  squash X
+         stretchMatrix[1][1] = 1 + scaleFactor; // stretch Y
+         stretchMatrix[2][2] = 1 + scaleFactor; // stretch Z
+    }
+
+    // Combine stretch with rotation
+    let modelTransform = mult(stretchMatrix, mRotation);
+
+    gl.uniformMatrix4fv(gl.getUniformLocation(program,"mRotation"), gl.FALSE, flatten(modelTransform));
+
+    
+
 
     gl.enable(gl.DEPTH_TEST);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -231,6 +258,14 @@ function render()
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers[3]);
 
     gl.uniform1i(gl.getUniformLocation(program, "useTexture"), true);
+    let stretchScale = [1.0, 1.0, 1.0]; // default no stretch
+
+    if (displacement_y < -1.0) {
+        stretchScale = [2.0, 0.5, 2.0]; // stretch x and z, squash y
+    }
+
+    gl.uniform3fv(gl.getUniformLocation(program, "stretchScale"), flatten(stretchScale));
+
     gl.drawElements(gl.TRIANGLES, nFaces * 3, gl.UNSIGNED_SHORT, 0);
 
     requestAnimationFrame(render);
