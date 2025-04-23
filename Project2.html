@@ -7,12 +7,13 @@
 
     varying  vec2 fUV;
     varying  vec3 fNormal;
-    varying  vec4 fColor;
     varying  vec3 fPosition;
+    varying  vec3 fLight;
 
     uniform vec3 theta;
     uniform float displacement_y;
     uniform mat4 mRotation;
+    uniform bool useTexture;
 
     void main()
     {
@@ -51,61 +52,79 @@
         0., 0., 1., 0.,
         0., displacement_y, -3., 1.);
 
+        mat4 mPVM = mProjection;
+        mat4 mVM = mat4(1.0);
 
-        gl_Position = mProjection * translation * mRotation * rz * ry * rx * vPosition;
+        if (useTexture)
+        {
+            mPVM = mProjection * translation * mRotation * rz * ry * rx;
+            mVM = translation * mRotation * rz * ry * rx;
+        }
+
+        vec3 pos = (mVM * vPosition).xyz;
+
+        fNormal =  (mVM * vec4(vNormal,0.)).xyz;
+        fPosition = -pos;
+        fLight = vec3(0., 0.5, 0.) - pos;
+
+        gl_Position = mPVM * vPosition;
         fUV = vUV;
-        fNormal =  (mRotation*rz * ry * rx * vec4(vNormal,0.)).xyz;
-        fColor = vPosition+vec4(0.5,0.5,0.5,0.);
     }
 </script>
 
-<script id="fragment-shader" type="x-shader/x-fragment">
-
+<script id="fragment-shader" type="x-shader/x-fragment"> 
 precision mediump float;
-varying vec2 fUV;
+
 varying vec3 fNormal;
-varying vec4 fColor;
 varying vec3 fPosition;
+varying vec3 fLight;
+varying vec2 fUV;
 
-uniform sampler2D uSampler;   
+uniform sampler2D uBumpMap;
+// uniform sampler2D uHeightMap;
 uniform bool useTexture;
-uniform bool isSphere;
-
-vec2 blinnPhongDir(vec3 lightDir, float lightInt, float Ka, float Kd, float Ks, float shininess)
-{
-  vec3 s = normalize(lightDir);
-  vec3 v = normalize(-fPosition);
-  vec3 n = normalize(fNormal);
-  vec3 h = normalize(v+s);
-  float diffuse = Ka + Kd * lightInt * abs(dot(n, s));
-  float spec =  Ks * pow(max(0.0, dot(n,h)), shininess);
-  return vec2(diffuse, spec);
-}
 
 void main()
 {
-    vec3 lightDirection = normalize(vec3(1., 2., 0.5));
-    float shading = max(0., dot(fNormal, lightDirection));
-    vec2 lighting;
-    vec4 color;
-
-    if (useTexture && isSphere)
+    if (useTexture)
     {
-        lighting = blinnPhongDir(normalize(vec3(1., 0.2, 0.5)), 4., 0.1, 0.7, 0.3, 32.);
-        color = vec4(lighting[0]*vec3(0.7,0.2,0.9) + lighting[1]*vec3(1.,1.,1.), 1.);
+        vec4 AmbientProduct = vec4(0.2, 0.2, 0.2, 1.);
+        vec4 DiffuseProduct = vec4(0.4, 0.12, 0.15, 1.);
+        vec4 SpecularProduct = vec4(.2, .2, .2, 1.);
 
-        gl_FragColor = color * texture2D(uSampler, fUV) + vec4(0.2, 0.2, 0.2, 0.);
-    }
+        float Shininess = 100.;
 
-    else if (useTexture)
-    {
-        lighting = blinnPhongDir(normalize(vec3(1., 0.2, 0.5)), 7., 0.1, 0.7, 0.3, 32.);
-        color = vec4(lighting[0]*vec3(0.1,0.4,0.3) + lighting[1]*vec3(1.,1.,1.), 1.);
+        vec2 displaced_texCoord = fUV;
+        vec3 E = normalize(fPosition);
 
-        gl_FragColor = color * texture2D(uSampler, fUV) + vec4(0.2, 0.2, 0.2, 0.);
-    }
-    else    
+        vec3 N = normalize(2. * texture2D(uBumpMap, fUV).xyz - 1.);
+
+        vec3 L = normalize(fLight); // Light Dir
+    
+        vec3 H = normalize(L + E);
+
+        vec4 fColor;
+
+        // Compute terms in the illumination equation
+        vec4 ambient = AmbientProduct;
+
+        float Kd = max(dot(L, N), 0.0);
+        vec4  diffuse = Kd * DiffuseProduct;
+
+        float Ks = pow(max(dot(N, H), 0.0), Shininess);
+        vec4  specular = Ks * SpecularProduct;
+        if(dot(L, N) < 0.0) 
+            specular = vec4(0.0, 0.0, 0.0, 1.0);
+
+        fColor = clamp(ambient + diffuse + specular, 0., 1.);
+        fColor.a = DiffuseProduct.a;
+
+        
         gl_FragColor = fColor;
+    }
+
+    else
+        gl_FragColor = vec4(1.);
 }
 </script>
 

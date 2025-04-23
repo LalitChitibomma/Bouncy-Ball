@@ -1,4 +1,3 @@
-
 var canvas;
 var gl;
 var program;
@@ -15,7 +14,8 @@ var yAxis = 1;
 var zAxis = 2;
 var theta = [0, 0, 0];
 
-var displacement_y = 2.;
+// Height
+var displacement_y = 1.3;
 var velocity_y = 0.;
 
 var bLButtonDown = false;
@@ -30,12 +30,11 @@ var isPause_r = false;
 
 let animationStarted = false;
 
-
 window.onload = function init()
 {
     initGL();
 
-    sphere();
+    sphere(0.75);
 
     initTexture();
 
@@ -96,15 +95,14 @@ function initGL()
     gl.useProgram(program);
 }
 
+// Bouncing Sphere Buffer
 var buffers = [];
 
-function sphere(subdivU = 40, subdivV = 40) {
+function sphere(radius = 1.0, subdivU = 40, subdivV = 40) {
     points = [];
     normals = [];
     UVs = [];
     indices = [];
-
-    let radius = 1.0;
 
     for (let i = 0; i <= subdivU; ++i) {
         let theta = i * Math.PI / subdivU;
@@ -133,36 +131,44 @@ function sphere(subdivU = 40, subdivV = 40) {
 
     nFaces = indices.length / 3;
 
-    // Create buffers (just like you do in rectangle())
+    // Vertex Buffer
     let vBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW);
     buffers.push(vBuffer);
 
+    // Normal Buffer
     let nBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(normals), gl.STATIC_DRAW);
     buffers.push(nBuffer);
 
+    // Texture Coordinate Buffer
     let tcBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, tcBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(UVs), gl.STATIC_DRAW);
     buffers.push(tcBuffer);
 
+    // Triangle Buffer
     let tBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(flatten(indices)), gl.STATIC_DRAW);
     buffers.push(tBuffer);
 }
 
-var sphereTexture;
+var bumpTexture;
+var heightTexture;
 
 function initTexture() {
-    sphereTexture = gl.createTexture();
-    var sphereImage = new Image();
+    bumpTexture = gl.createTexture();
+    var bumpImage = new Image();
+    bumpImage.onload = function () { handleTextureLoaded(bumpImage, bumpTexture); }
+    bumpImage.src = "Material/bumpmap.jpg";
 
-    sphereImage.onload = function () { handleTextureLoaded(sphereImage, sphereTexture); }
-    sphereImage.src = "Material/marble10.png";
+    // heightTexture = gl.createTexture();
+    // var heightImage = new Image();
+    // heightImage.onload = function () { handleTextureLoaded(heightImage, heightTexture); }
+    // heightImage.src = "Material/height.bmp";
 }
 
 function handleTextureLoaded(image, texture) {
@@ -195,15 +201,21 @@ function render()
 
     gl.enable(gl.DEPTH_TEST);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.clearColor(0, 0, 0, 0.3);
 
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, sphereTexture);
-    gl.uniform1i(gl.getUniformLocation(program, "uSampler"), 0);
+    gl.bindTexture(gl.TEXTURE_2D, bumpTexture);
+    gl.uniform1i(gl.getUniformLocation(program, "uBumpMap"), 0);
+
+    // gl.activeTexture(gl.TEXTURE0);
+    // gl.bindTexture(gl.TEXTURE_2D, heightTexture);
+    // gl.uniform1i(gl.getUniformLocation(program, "uHeightMap"), 0);
 
     var vPosition = gl.getAttribLocation(program, "vPosition");
     var vNormal = gl.getAttribLocation(program, "vNormal");
     var vUV = gl.getAttribLocation(program, "vUV");
 
+    // Bouncing Sphere
     gl.bindBuffer(gl.ARRAY_BUFFER, buffers[0]);
     gl.vertexAttribPointer(vPosition, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vPosition);
@@ -219,7 +231,6 @@ function render()
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers[3]);
 
     gl.uniform1i(gl.getUniformLocation(program, "useTexture"), true);
-    gl.uniform1i(gl.getUniformLocation(program, "isSphere"), false);
     gl.drawElements(gl.TRIANGLES, nFaces * 3, gl.UNSIGNED_SHORT, 0);
 
     requestAnimationFrame(render);
