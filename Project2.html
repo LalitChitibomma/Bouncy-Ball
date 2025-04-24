@@ -69,63 +69,69 @@
 
         gl_Position = mPVM * vPosition;
         fUV = vUV;
+        
+        
     }
 </script>
 
-<script id="fragment-shader" type="x-shader/x-fragment"> 
-precision mediump float;
 
-varying vec3 fNormal;
-varying vec3 fPosition;
-varying vec3 fLight;
-varying vec2 fUV;
+<script id="bg-vertex-shader" type="x-shader/x-vertex">
+        attribute vec4 bgPosition;
+        attribute vec2 bgUV;
+        varying vec2 fUV;
+        
+        void main() {
+            fUV = bgUV;
+            gl_Position = bgPosition;
+        }
+        </script>
 
-uniform sampler2D uBumpMap;
-// uniform sampler2D uHeightMap;
-uniform bool useTexture;
 
-void main()
-{
-    if (useTexture)
-    {
-        vec4 AmbientProduct = vec4(0.2, 0.2, 0.2, 1.);
-        vec4 DiffuseProduct = vec4(0.4, 0.12, 0.15, 1.);
-        vec4 SpecularProduct = vec4(.2, .2, .2, 1.);
-
-        float Shininess = 100.;
-
-        vec2 displaced_texCoord = fUV;
-        vec3 E = normalize(fPosition);
-
-        vec3 N = normalize(2. * texture2D(uBumpMap, fUV).xyz - 1.);
-
-        vec3 L = normalize(fLight); // Light Dir
+<script id="bg-fragment-shader" type="x-shader/x-fragment">
+    precision mediump float;
+    varying vec2 fUV;
+    uniform sampler2D uBackground;
     
-        vec3 H = normalize(L + E);
-
-        vec4 fColor;
-
-        // Compute terms in the illumination equation
-        vec4 ambient = AmbientProduct;
-
-        float Kd = max(dot(L, N), 0.0);
-        vec4  diffuse = Kd * DiffuseProduct;
-
-        float Ks = pow(max(dot(N, H), 0.0), Shininess);
-        vec4  specular = Ks * SpecularProduct;
-        if(dot(L, N) < 0.0) 
-            specular = vec4(0.0, 0.0, 0.0, 1.0);
-
-        fColor = clamp(ambient + diffuse + specular, 0., 1.);
-        fColor.a = DiffuseProduct.a;
-        
-        
-        gl_FragColor = fColor;
+    void main() {
+        gl_FragColor = texture2D(uBackground, fUV);
     }
+    </script>
 
-    else
-        gl_FragColor = vec4(1.);
-}
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+    precision mediump float;
+
+    varying vec3 fNormal;
+    varying vec3 fPosition;
+    varying vec3 fLight;
+    varying vec2 fUV;
+    
+    uniform sampler2D uBumpMap;
+    uniform samplerCube uEnvMap;
+    uniform float eta;
+    uniform bool useTexture;
+    
+    void main()
+    {
+        if (useTexture) {
+            vec3 normal = normalize(fNormal);
+            vec3 view = normalize(-fPosition);
+    
+            // Refraction direction
+            vec3 refracted = refract(view, normal, eta);
+    
+            // Sample from environment cube map
+            vec4 envColor = textureCube(uEnvMap, refracted);
+    
+            // Fresnel reflection effect (optional for realism)
+            float fresnel = pow(1.0 - dot(-view, normal), 3.0) * 0.7 + 0.3;
+    
+            // Final color with transparency
+            gl_FragColor = vec4(envColor.rgb * fresnel, 0.6);
+        } else {
+            gl_FragColor = vec4(1.0);
+        }
+    }
 </script>
 
 <script type="text/javascript" src="./Common/webgl-utils.js"></script>
@@ -134,13 +140,14 @@ void main()
 <script type="text/javascript" src="Project2.js"></script>
 
 <body>
-<canvas id="gl-canvas" width="512" height="512">
-Oops ... your browser doesn't support the HTML5 canvas element
-</canvas>
-<br />
-<button id="xButton">Rotate X</button>
-<button id="yButton">Rotate Y</button>
-<button id="zButton">Rotate Z</button>
-<button id="pButton">Pause</button>
+    <canvas id="gl-canvas" width="512" height="512">
+        Oops ... your browser doesn't support the HTML5 canvas element
+    </canvas>
+    <br />
+    <button id="xButton">Rotate X</button>
+    <button id="yButton">Rotate Y</button>
+    <button id="zButton">Rotate Z</button>
+    <button id="pButton">Pause</button>
 </body>
+
 </html>

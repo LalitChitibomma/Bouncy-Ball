@@ -28,11 +28,14 @@ var isPause_t = false;
 var inc_r = 2.0;
 var isPause_r = false;
 
+var bgProgram;
+var bgBuffer;
+var bgTexture;
+
 let animationStarted = false;
 let squashTimer = 0;
 
-window.onload = function init()
-{
+window.onload = function init() {
     initGL();
 
     sphere(0.75);
@@ -70,19 +73,18 @@ window.onload = function init()
     document.onmousemove = OnMouseMove;
     document.onmouseup = OnMouseUp;
 
-    
+
     requestAnimationFrame(render);
 
     setTimeout(() => {
         animationStarted = true;
     }, 5000);
-    
-    
-  
+
+
+
 }
 
-function initGL()
-{
+function initGL() {
     canvas = document.getElementById("gl-canvas");
 
     gl = WebGLUtils.setupWebGL(canvas);
@@ -92,7 +94,25 @@ function initGL()
     gl.clearColor(1.0, 1.0, 1.0, 1.0);
 
     program = initShaders(gl, "vertex-shader", "fragment-shader");
+    bgProgram = initShaders(gl, "bg-vertex-shader", "bg-fragment-shader");
+
+    bgBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bgBuffer);
+
+    const bgVertices = new Float32Array([
+        -1, -1, 0, 0,
+        1, -1, 1, 0,
+        -1, 1, 0, 1,
+        1, 1, 1, 1
+    ]);
+
+    gl.bufferData(gl.ARRAY_BUFFER, bgVertices, gl.STATIC_DRAW);
+
     gl.useProgram(program);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
 }
 
 // Bouncing Sphere Buffer
@@ -165,11 +185,53 @@ function initTexture() {
     bumpImage.onload = function () { handleTextureLoaded(bumpImage, bumpTexture); }
     bumpImage.src = "Material/bumpmap.jpg";
 
+    bgTexture = gl.createTexture();
+    const bgImage = new Image();
+    bgImage.onload = function () {
+        gl.bindTexture(gl.TEXTURE_2D, bgTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bgImage);
+        gl.generateMipmap(gl.TEXTURE_2D);
+    };
+    bgImage.src = "Material/marble10.png";  // Or "HelloWorld.png"
+
+
     // heightTexture = gl.createTexture();
     // var heightImage = new Image();
     // heightImage.onload = function () { handleTextureLoaded(heightImage, heightTexture); }
     // heightImage.src = "Material/height.bmp";
+
+    loadCubeMap();
 }
+
+var envMap;
+
+function loadCubeMap() {
+    envMap = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, envMap);
+
+    const faceInfos = [
+        { target: gl.TEXTURE_CUBE_MAP_POSITIVE_X, url: 'Material/bluecloud_bk.jpg' },
+        { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_X, url: 'Material/bluecloud_dn.jpg' },
+        { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Y, url: 'Material/bluecloud_ft.jpg' },
+        { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, url: 'Material/bluecloud_lf.jpg' },
+        { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Z, url: 'Material/bluecloud_rt.jpg' },
+        { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, url: 'Material/bluecloud_up.jpg' },
+    ];
+
+    faceInfos.forEach((faceInfo) => {
+        const { target, url } = faceInfo;
+        const image = new Image();
+        image.onload = function () {
+            gl.bindTexture(gl.TEXTURE_CUBE_MAP, envMap);
+            gl.texImage2D(target, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+        };
+        image.src = url;
+    });
+
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+}
+
 
 function handleTextureLoaded(image, texture) {
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -187,8 +249,37 @@ function clamp(num, min, max) {
 let deltaTime = 0.03;
 let time = 0.;
 
-function render()
-{
+function render() {
+
+    // === DRAW BACKGROUND TEXTURE ===
+    gl.useProgram(bgProgram);
+    gl.disable(gl.DEPTH_TEST); // Draw background behind everything
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, bgBuffer);
+
+    // Use new attribute names to avoid conflict with the ball
+    const bgPosLoc = gl.getAttribLocation(bgProgram, "bgPosition");
+    const bgUVLoc = gl.getAttribLocation(bgProgram, "bgUV");
+
+    gl.vertexAttribPointer(bgPosLoc, 2, gl.FLOAT, false, 4 * 4, 0);
+    gl.enableVertexAttribArray(bgPosLoc);
+
+    gl.vertexAttribPointer(bgUVLoc, 2, gl.FLOAT, false, 4 * 4, 2 * 4);
+    gl.enableVertexAttribArray(bgUVLoc);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, bgTexture);
+    gl.uniform1i(gl.getUniformLocation(bgProgram, "uBackground"), 0);
+
+    // Clear canvas before drawing background
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    // Switch back to main program for ball rendering
+    gl.useProgram(program);
+    gl.enable(gl.DEPTH_TEST);
+
+
     if (animationStarted) {
         // v_f = v_i + at (a = -9.8, t = 0.01)
         if (!isPause_t)
@@ -247,7 +338,7 @@ function render()
 
 
     gl.enable(gl.DEPTH_TEST);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.clearColor(0, 0, 0, 0.3);
 
     gl.activeTexture(gl.TEXTURE0);
@@ -286,14 +377,19 @@ function render()
 
     gl.uniform3fv(gl.getUniformLocation(program, "stretchScale"), flatten(stretchScale));
 
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, envMap);
+    gl.uniform1i(gl.getUniformLocation(program, "uEnvMap"), 1);
+    gl.uniform1f(gl.getUniformLocation(program, "eta"), 0.75);  // Glass refraction index
+
+
     gl.drawElements(gl.TRIANGLES, nFaces * 3, gl.UNSIGNED_SHORT, 0);
 
     requestAnimationFrame(render);
 }
 
 
-function OnKeyDown(event)
-{
+function OnKeyDown(event) {
     if (event.keyCode == 37) {
         theta[1] -= 30.0;
     }
@@ -303,14 +399,12 @@ function OnKeyDown(event)
     }
 
     if (event.keyCode == 80) {
-        if (isPause_r == true) 
-        {
+        if (isPause_r == true) {
             inc_r = 2.0;
             isPause_r = false;
         }
 
-        else
-        {
+        else {
             inc_r = 0.0;
             isPause_r = true;
         }
@@ -322,8 +416,7 @@ function OnKeyDown(event)
     }
 }
 
-function OnMouseDown(event)
-{
+function OnMouseDown(event) {
     var vVec = Intersect(event.clientX, event.clientY);
     vDown = vVec;
     bLButtonDown = true;
@@ -333,12 +426,11 @@ function OnMouseUp(event) {
     bLButtonDown = false;
 }
 
-function OnMouseMove(event)
-{
+function OnMouseMove(event) {
     if (bLButtonDown) {
         vVec = Intersect(event.clientX, event.clientY);
         rot_axis = cross(vDown, vVec);
-        sine = Math.sqrt(dot(rot_axis,rot_axis));
+        sine = Math.sqrt(dot(rot_axis, rot_axis));
         angle = 180. / Math.acos(-1.) * Math.atan2(sine, dot(vDown, vVec));
         if (sine > 1.e-10)
             rot_axis = vec3(rot_axis[0] / sine, rot_axis[1] / sine, rot_axis[2] / sine);
@@ -349,8 +441,7 @@ function OnMouseMove(event)
     }
 }
 
-function Intersect(x, y)
-{
+function Intersect(x, y) {
     var rect = canvas.getBoundingClientRect();
 
     // Calculate mouse position relative to the canvas
@@ -361,7 +452,7 @@ function Intersect(x, y)
     var yc = 512 / 2;
     var R = 512 / 2;
 
-    var vOut = vec3((x - xc) / R, (yc-y) / R, 0.);
+    var vOut = vec3((x - xc) / R, (yc - y) / R, 0.);
     len = dot(vOut, vOut);
     if (len <= 1.)
         vOut[2] = Math.sqrt(1 - len);
