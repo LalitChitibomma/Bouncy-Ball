@@ -113,9 +113,38 @@
     
     void main()
     {
+        vec4 AmbientProduct = vec4(0.2, 0.2, 0.2, 1.);
+        vec4 DiffuseProduct = vec4(0.4, 0.12, 0.15, 1.);
+        vec4 SpecularProduct = vec4(.2, .2, .2, 1.);
+
+        float Shininess = 100.;
+
+        vec3 view = normalize(-fPosition);
+
+        vec3 normal = normalize(2. * texture2D(uBumpMap, fUV).xyz - 1.);
+
+        vec3 light = normalize(fLight); // Light Dir
+    
+        vec3 hal = normalize(light + view);
+
+        vec4 fColor;
+
         if (useTexture) {
-            vec3 normal = normalize(fNormal);
-            vec3 view = normalize(-fPosition);
+            // Compute terms in the illumination equation
+            vec4 ambient = AmbientProduct;
+    
+            float Kd = max(dot(light, normal), 0.0);
+            vec4  diffuse = Kd * DiffuseProduct;
+    
+            float Ks = pow(max(dot(normal, hal), 0.0), Shininess);
+            vec4  specular = Ks * SpecularProduct;
+            if(dot(light, normal) < 0.0) 
+                specular = vec4(0.0, 0.0, 0.0, 1.0);
+    
+            fColor = clamp(ambient + diffuse + specular, 0., 1.);
+            fColor.a = DiffuseProduct.a;
+            
+            gl_FragColor = fColor;
     
             // Refraction direction
             vec3 refracted = refract(view, normal, eta);
@@ -127,8 +156,10 @@
             float fresnel = pow(1.0 - dot(-view, normal), 3.0) * 0.7 + 0.3;
     
             // Final color with transparency
-            gl_FragColor = vec4(envColor.rgb * fresnel, 0.6);
-        } else {
+            gl_FragColor += vec4(envColor.rgb * fresnel, 0.6);
+        } 
+        
+        else {
             gl_FragColor = vec4(1.0);
         }
     }
