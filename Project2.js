@@ -22,7 +22,7 @@ var bLButtonDown = false;
 var vDown = [0., 0., 0.];
 var mRotation = mat4();
 
-var inc_t = 0.1;
+var inc_t = 0.001;
 var isPause_t = false;
 
 var inc_r = 2.0;
@@ -54,13 +54,12 @@ window.onload = function init()
     document.getElementById("pButton").onclick = function () {
         if ((isPause_t == true))
         {
-            inc_t = 0.1;
+            inc_t = 0.001;
             isPause_t = false;
         }
         else
         {
-            inc_t = 0.0;
-            velocity_y = 0.
+            inc_t = 0.;
             isPause_t = true;
         }
     };
@@ -181,11 +180,19 @@ function handleTextureLoaded(image, texture) {
     gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
+let deltaTime = 0.03;
+let time = 0.;
+
 function render()
 {
     if (animationStarted) {
-        velocity_y = 0.9999 * velocity_y - inc_t;
-        displacement_y = displacement_y + velocity_y * 0.03;
+        // v_f = v_i + at (a = -9.8, t = 0.01)
+        if (!isPause_t)
+        {
+            velocity_y = 0.9999 * velocity_y + (-9.8 * inc_t);
+            time += inc_t;
+            displacement_y = displacement_y + velocity_y * deltaTime;
+        }
 
         if (displacement_y < -1.5) {
             displacement_y = -1.5;
@@ -193,25 +200,28 @@ function render()
         }
     }
 
+    console.log(time + ' vel ' + velocity_y + ', dis ' + displacement_y);
+
     gl.uniform1f(gl.getUniformLocation(program, "displacement_y"), displacement_y);
+    gl.uniform1f(gl.getUniformLocation(program, "time"), time);
 
     theta[axis] += inc_r;
     gl.uniform3fv(gl.getUniformLocation(program, "theta"), theta);
 
     let stretchMatrix = mat4();
     let scaleFactor = (Math.abs(velocity_y))/4;
-
+    let wideFactor = -(displacement_y + 0.5)/4;
 
     //note default stretch is 1.
     //impact handling
-    if (displacement_y <= -1.5 && velocity_y < 0 ) {
+    if (displacement_y <= -0.5 && velocity_y > 0 ) {
         // Wide in X and Z, squash in Y
-        stretchMatrix[0][0] = 1 + scaleFactor; //  stretch X
-        stretchMatrix[1][1] = 1 /(1 + scaleFactor); // squash Y
-        stretchMatrix[2][2] = 1 + scaleFactor; // stretch Z
+        stretchMatrix[0][0] = 1 + wideFactor; //  stretch X
+        stretchMatrix[1][1] = 1 / (1 + wideFactor); // squash Y
+        stretchMatrix[2][2] = 1 + wideFactor; // stretch Z
     }
     //ball raising
-    if (displacement_y > -1.5 && velocity_y > 0){
+    if (displacement_y > 0 && velocity_y > 0){
          // Skinny in Y and Z, squash in X
          stretchMatrix[0][0] = 1 /(1 + scaleFactor); //  squash X
          stretchMatrix[1][1] = 1 + scaleFactor; // stretch Y

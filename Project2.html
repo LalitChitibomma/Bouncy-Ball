@@ -118,7 +118,7 @@ void main()
 
         fColor = clamp(ambient + diffuse + specular, 0., 1.);
         fColor.a = DiffuseProduct.a;
-
+        
         
         gl_FragColor = fColor;
     }
